@@ -1,15 +1,16 @@
+@group(0) @binding(0)
+var<storage, read_write> a: array<f32>;
 
-@group(0)
-@binding(0)
-var <storage, read_write> v_indices: array<u32>;
+@group(0) @binding(1)
+var<storage, read_write> b: array<f32>;
 
-fn evenOne(x: u32) -> u32 {
-    if(x%2 == 0) {return 1u;}
-    return 0u;
-}
+@group(0) @binding(2)
+var<storage, read_write> output: array<f32>;
+
+
 
 @compute
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    v_indices[global_id.x] = evenOne(v_indices[global_id.x]);
+    output[global_id.x] = a[global_id.x] + b[global_id.x];
 }

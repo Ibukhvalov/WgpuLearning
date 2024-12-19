@@ -1,6 +1,11 @@
-use std::{str::FromStr};
+use rand::{thread_rng, Rng};
 use wgpu::include_wgsl;
 use wgpu::util::DeviceExt;
+
+
+// max dispatch group size in each dimension is 65535
+const VECTOR_SIZE: usize = 60_000;
+
 
 fn main() {
     pollster::block_on(run());
@@ -8,22 +13,30 @@ fn main() {
 
 
 async fn run() {
-    let numbers = if std::env::args().len() > 1 {
-       std::env::args().skip(1)
-           .map(|s| {
-               u32::from_str(&s).expect("You must pass a list of positive integers!")
-       }).collect()
-    } else {
-        vec![1u32,2u32,3u32,4u32]
-    };
+    let mut rng = thread_rng();
+    let mut a: [f32; VECTOR_SIZE] = [0f32; VECTOR_SIZE];
+    let mut b: [f32; VECTOR_SIZE] = [0f32; VECTOR_SIZE];
 
-    let result = execute_gpu(&numbers).await;
-    println!("Executing with: {numbers:?}");
-    println!("Result: {result:?}");
+    rng.fill(&mut a[..]);
+    rng.fill(&mut b[..]);
+
+
+    let result = execute_gpu(&a, &b).await.unwrap();
+
+
+    for i in 0..VECTOR_SIZE {
+        if a[i] + b[i] != result[i] {
+            panic!("{} + {} != {}", a[i], b[i], result[i]);
+        }
+    }
+    println!("All computations completed  correctly!");
+    let rand_index = rng.gen_range(0..VECTOR_SIZE);
+    println!("A random example of result:\n{} + {} = {}", a[rand_index], b[rand_index], a[rand_index]+b[rand_index]);
+
 
 }
 
-async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
+async fn execute_gpu(a: &[f32], b: &[f32]) -> Option<Vec<f32>> {
     let instance = wgpu::Instance::default();
     let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await?;
     let (device, queue) = adapter
@@ -37,7 +50,9 @@ async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
             None).await.unwrap();
 
     let cs_module = device.create_shader_module(include_wgsl!("shader.wgsl"));
-    let size = size_of_val(numbers) as wgpu::BufferAddress;
+
+
+    let size = size_of_val(a) as wgpu::BufferAddress;
 
     let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -46,11 +61,23 @@ async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
         mapped_at_creation: false,
     });
 
-    let storage_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        contents: bytemuck::cast_slice(numbers),
+    let a_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("A Buffer"),
+        contents: bytemuck::cast_slice(&a),
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
     });
+    let b_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("B Buffer"),
+        contents: bytemuck::cast_slice(&b),
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+    });
+    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Output Buffer"),
+        size,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+
 
     let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor{
         label: None,
@@ -65,10 +92,19 @@ async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout: &bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: storage_buffer.as_entire_binding(),
-        }]
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: a_buffer.as_entire_binding(),
+        },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: b_buffer.as_entire_binding(),
+        },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: output_buffer.as_entire_binding(),
+        },]
     });
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -76,9 +112,9 @@ async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None, timestamp_writes: None });
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups(numbers.len() as u32, 1, 1);
+        cpass.dispatch_workgroups(VECTOR_SIZE as u32, 1, 1);
     }
-    encoder.copy_buffer_to_buffer(&storage_buffer, 0, &staging_buffer, 0, size);
+    encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, size);
     queue.submit(Some(encoder.finish()));
 
 
