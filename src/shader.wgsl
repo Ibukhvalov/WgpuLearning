@@ -4,10 +4,10 @@ struct Matrix {
 
 
 @group(0) @binding(0)
-var<storage, read_write> a: Matrix;
+var<storage, read> a: Matrix;
 
 @group(0) @binding(1)
-var<storage, read_write> b: Matrix;
+var<storage, read> b: Matrix;
 
 @group(0) @binding(2)
 var<storage, read_write> output: Matrix;
