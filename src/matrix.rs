@@ -1,10 +1,11 @@
+use log::debug;
 use crate::MATRIX_SIZE;
 use rand::{thread_rng, Rng};
 
 
 #[repr(C)]
 pub struct Matrix {
-    pub(crate) val: Vec<f32>,
+    pub val: Vec<f32>,
 }
 
 
@@ -24,7 +25,12 @@ impl Matrix {
         mat
     }
 
+    pub fn data_size(&self) -> usize {
+        self.val.len() * size_of::<f32>()
+    }
+
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+
         let unit_size = size_of::<f32>();
 
         if bytes.len() % unit_size != 0 {
@@ -45,7 +51,7 @@ impl Matrix {
 
 
     #[warn(dead_code)]
-    fn print(&self) {
+    pub fn print(&self) {
         let size = MATRIX_SIZE;
         for i in 0..size {
             for j in 0..size {

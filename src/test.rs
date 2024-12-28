@@ -1,4 +1,4 @@
-
+use crate::matrix::Matrix;
 
 #[test]
 fn byte_conv() {
@@ -7,4 +7,12 @@ fn byte_conv() {
     let conved_mat = Matrix::from_bytes(byted_mat).unwrap();
 
     assert_eq!(mat.val, conved_mat.val);
+}
+
+
+#[test]
+fn mem() {
+    let mat = Matrix::new_rand(10);
+
+    assert_eq!(mat.data_size(), 10*10*4);
 }
