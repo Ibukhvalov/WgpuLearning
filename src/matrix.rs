@@ -1,11 +1,49 @@
-use log::debug;
+use std::ops::Mul;
 use crate::MATRIX_SIZE;
 use rand::{thread_rng, Rng};
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Matrix {
     pub val: Vec<f32>,
+}
+
+impl PartialEq for Matrix {
+    fn eq(&self, other: &Self) -> bool {
+        let len = self.val.len();
+        if len != other.val.len() { return false; }
+        else {
+            for i in 0..len {
+                if self.val[i] != other.val[i] {
+                    if (self.val[i] - other.val[i]).abs() > 0.001 {
+                        log::debug!("{} {}", self.val[i], other.val[i]);
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+        
+    }
+}
+
+impl Mul for Matrix {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut result = Self{val: vec![0.0; self.val.len()]};
+        
+        for i in 0..MATRIX_SIZE {
+            for j in 0..MATRIX_SIZE {
+                for k in 0..MATRIX_SIZE {
+                    result.val[i * MATRIX_SIZE + j] += self.val[i * MATRIX_SIZE + k] * rhs.val[k * MATRIX_SIZE + j];
+                }
+            }
+        };
+
+        result
+    }
 }
 
 

@@ -3,7 +3,7 @@ mod matrix;
 #[cfg(test)]
 mod test;
 
-use log::info;
+use log::{info, debug};
 use matrix::Matrix;
 use wgpu::include_wgsl;
 use wgpu::util::DeviceExt;
@@ -11,29 +11,23 @@ use wgpu::util::DeviceExt;
 // max dispatch group size in each dimension is 65535
 // max buffer size is 256mb
 // max bind group is 128mb
-const MATRIX_SIZE: usize = 5000;
+const MATRIX_SIZE: usize = 3;
+const TILE_SIZE: usize = 2;
 
 fn main() {
     env_logger::builder()
         .filter_module("shader_learning", log::LevelFilter::Debug)
         .init();
 
-    pollster::block_on(run());
-}
-
-async fn run() {
     info!("Generating matrix data");
+
+
     let a = Matrix::new_rand(MATRIX_SIZE);
     let b = Matrix::new_rand(MATRIX_SIZE);
 
-    let result = execute_gpu(&a, &b).await.unwrap();
-
-    if MATRIX_SIZE < 8 {
-        a.print();
-        b.print();
-        result.print();
-    }
+    pollster::block_on(execute_gpu(&a,&b));
 }
+
 
 async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
 
@@ -54,6 +48,7 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         )
         .await
         .unwrap();
+
 
     let cs_module = device.create_shader_module(include_wgsl!("shader.wgsl"));
 
@@ -141,7 +136,12 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         });
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups(MATRIX_SIZE as u32, MATRIX_SIZE as u32, 1);
+
+        let workgoup_num = MATRIX_SIZE.div_ceil(TILE_SIZE);
+
+        debug!("Dispatched {} {} {}", workgoup_num as u32, workgoup_num as u32, 1);
+
+        cpass.dispatch_workgroups(workgoup_num as u32, workgoup_num as u32, 1);
     }
     encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, size);
     queue.submit(Some(encoder.finish()));
