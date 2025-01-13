@@ -1,5 +1,6 @@
 mod matrix;
 
+
 #[cfg(test)]
 mod test;
 
@@ -11,8 +12,10 @@ use wgpu::util::DeviceExt;
 // max dispatch group size in each dimension is 65535
 // max buffer size is 256mb
 // max bind group is 128mb
-const MATRIX_SIZE: usize = 3;
-const TILE_SIZE: usize = 2;
+const MATRIX_SIZE: usize = 5000;
+const TILE_SIZE: usize = 16;
+
+
 
 fn main() {
     env_logger::builder()
@@ -67,7 +70,7 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         usage: wgpu::BufferUsages::STORAGE,
     });
 
-    info!("Created A Buffer");
+    info!("Creating buffers");
 
     let b_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("B Buffer"),
@@ -75,7 +78,6 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         usage: wgpu::BufferUsages::STORAGE,
     });
 
-    info!("Created B Buffer");
 
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Buffer"),
@@ -84,7 +86,6 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         mapped_at_creation: false,
     });
 
-    info!("Created Output Buffer");
 
     let size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Size buffer"),

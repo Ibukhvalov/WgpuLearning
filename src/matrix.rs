@@ -1,7 +1,8 @@
 use std::ops::Mul;
 use crate::MATRIX_SIZE;
-use rand::{thread_rng, Rng};
+use xorshift::{Rng, SeedableRng, Xorshift128};
 
+use clock_ticks::precise_time_ns;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -11,6 +12,8 @@ pub struct Matrix {
 
 impl PartialEq for Matrix {
     fn eq(&self, other: &Self) -> bool {
+        self.val == other.val
+        /*
         let len = self.val.len();
         if len != other.val.len() { return false; }
         else {
@@ -24,6 +27,7 @@ impl PartialEq for Matrix {
             }
         }
         return true;
+        */
         
     }
 }
@@ -52,12 +56,14 @@ impl Matrix {
     pub fn new_rand(dim_size: usize) -> Self {
         let num_of_el = dim_size*dim_size;
 
-        let mut rng = thread_rng();
+        let now = precise_time_ns();
+        let seed = [now, now];
+        let mut rng: Xorshift128 = SeedableRng::from_seed(&seed[..]);
 
         let mut mat = Self { val: Vec::with_capacity(num_of_el) };
 
         for _ in 0..num_of_el {
-            mat.val.push(rng.gen_range(0f32..10f32));
+            mat.val.push((rng.next_f32() - 0.5f32) * 100f32);
         }
 
         mat
@@ -68,7 +74,6 @@ impl Matrix {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
-
         let unit_size = size_of::<f32>();
 
         if bytes.len() % unit_size != 0 {
@@ -83,6 +88,7 @@ impl Matrix {
 
             mat.val.push(float_val);
         }
+
 
         Ok(mat)
     }
