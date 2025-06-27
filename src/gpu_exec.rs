@@ -1,39 +1,17 @@
-mod matrix;
 
-
-#[cfg(test)]
-mod test;
+use super::matrix::Matrix;
 
 use log::{info, debug};
-use matrix::Matrix;
 use wgpu::include_wgsl;
 use wgpu::util::DeviceExt;
 
 // max dispatch group size in each dimension is 65535
 // max buffer size is 256mb
 // max bind group is 128mb
-const MATRIX_SIZE: usize = 5000;
 const TILE_SIZE: usize = 16;
 
-
-
-fn main() {
-    env_logger::builder()
-        .filter_module("shader_learning", log::LevelFilter::Debug)
-        .init();
-
-    info!("Generating matrix data");
-
-
-    let a = Matrix::new_rand(MATRIX_SIZE);
-    let b = Matrix::new_rand(MATRIX_SIZE);
-
-    pollster::block_on(execute_gpu(&a,&b));
-}
-
-
-async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
-
+pub async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
+    assert_eq!(a.size(), b.size());
     info!("Getting gpu ready");
     let instance = wgpu::Instance::default();
     let adapter = instance
@@ -44,7 +22,10 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
             &wgpu::DeviceDescriptor {
                 label: None,
                 required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
+                required_limits: wgpu::Limits {
+                    max_buffer_size: 4000000000,
+                    max_storage_buffer_binding_size: 4000000000,
+                    ..wgpu::Limits::default()},
                 memory_hints: wgpu::MemoryHints::MemoryUsage,
             },
             None,
@@ -53,7 +34,7 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         .unwrap();
 
 
-    let cs_module = device.create_shader_module(include_wgsl!("shader.wgsl"));
+    let cs_module = device.create_shader_module(include_wgsl!("../shaders/shader.wgsl"));
 
     let size = a.data_size() as wgpu::BufferAddress;
 
@@ -89,7 +70,7 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
 
     let size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Size buffer"),
-        contents: bytemuck::bytes_of(&MATRIX_SIZE),
+        contents: bytemuck::bytes_of(&(a.size() as u32)),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
@@ -138,7 +119,7 @@ async fn execute_gpu(a: &Matrix, b: &Matrix) -> Option<Matrix> {
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
 
-        let workgoup_num = MATRIX_SIZE.div_ceil(TILE_SIZE);
+        let workgoup_num = a.size().div_ceil(TILE_SIZE);
 
         debug!("Dispatched {} {} {}", workgoup_num as u32, workgoup_num as u32, 1);
 

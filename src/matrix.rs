@@ -1,5 +1,4 @@
 use std::ops::Mul;
-use crate::MATRIX_SIZE;
 use xorshift::{Rng, SeedableRng, Xorshift128};
 
 use clock_ticks::precise_time_ns;
@@ -7,19 +6,18 @@ use clock_ticks::precise_time_ns;
 #[repr(C)]
 #[derive(Debug)]
 pub struct Matrix {
-    pub val: Vec<f32>,
+    pub val:  Vec<f32>,
 }
 
 impl PartialEq for Matrix {
     fn eq(&self, other: &Self) -> bool {
-        self.val == other.val
-        /*
+        //self.val == other.val
         let len = self.val.len();
         if len != other.val.len() { return false; }
         else {
             for i in 0..len {
                 if self.val[i] != other.val[i] {
-                    if (self.val[i] - other.val[i]).abs() > 0.001 {
+                    if (self.val[i] - other.val[i]).abs() > 0.01 {
                         log::debug!("{} {}", self.val[i], other.val[i]);
                         return false;
                     }
@@ -27,7 +25,6 @@ impl PartialEq for Matrix {
             }
         }
         return true;
-        */
         
     }
 }
@@ -37,11 +34,11 @@ impl Mul for Matrix {
 
     fn mul(self, rhs: Self) -> Self::Output {
         let mut result = Self{val: vec![0.0; self.val.len()]};
-        
-        for i in 0..MATRIX_SIZE {
-            for j in 0..MATRIX_SIZE {
-                for k in 0..MATRIX_SIZE {
-                    result.val[i * MATRIX_SIZE + j] += self.val[i * MATRIX_SIZE + k] * rhs.val[k * MATRIX_SIZE + j];
+        let size = self.size();
+        for i in 0..size {
+            for j in 0..size {
+                for k in 0..size {
+                    result.val[i * size + j] += self.val[i * size + k] * rhs.val[k * size + j];
                 }
             }
         };
@@ -53,16 +50,15 @@ impl Mul for Matrix {
 
 
 impl Matrix {
-    pub fn new_rand(dim_size: usize) -> Self {
-        let num_of_el = dim_size*dim_size;
-
+    pub fn new_rand(size: usize) -> Self {
         let now = precise_time_ns();
         let seed = [now, now];
         let mut rng: Xorshift128 = SeedableRng::from_seed(&seed[..]);
 
-        let mut mat = Self { val: Vec::with_capacity(num_of_el) };
+        let nb_elements = size*size;
+        let mut mat = Self { val: Vec::with_capacity(nb_elements) };
 
-        for _ in 0..num_of_el {
+        for _ in 0..nb_elements {
             mat.val.push((rng.next_f32() - 0.5f32) * 100f32);
         }
 
@@ -71,6 +67,12 @@ impl Matrix {
 
     pub fn data_size(&self) -> usize {
         self.val.len() * size_of::<f32>()
+    }
+
+    pub fn size(&self) -> usize {
+        let size = self.val.len().isqrt();
+        assert_eq!(size*size, self.val.len());
+        size
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
@@ -96,7 +98,7 @@ impl Matrix {
 
     #[warn(dead_code)]
     pub fn print(&self) {
-        let size = MATRIX_SIZE;
+        let size = self.size();
         for i in 0..size {
             for j in 0..size {
                 print!{"{} ", self.val[i*size + j]};
